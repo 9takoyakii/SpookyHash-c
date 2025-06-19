@@ -1,3 +1,11 @@
+/**
+  * SpookyV2.h - Port of SpookyHash in the C programming language.
+  *
+  * Repository: https://github.com/9takoyakii/SpookyHash-c
+  * Reference: https://burtleburtle.net/bob/hash/spooky.html
+  * All source code is in the public domain, so you are free to use, modify or distribute it.
+*/
+
 #ifndef __SPOOKY_HASH_V1_C
 #define __SPOOKY_HASH_V1_C
 
