@@ -10,6 +10,7 @@
 #define __SPOOKY_HASH_V1_C
 
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef _MSVC_VER
 
@@ -33,13 +34,16 @@ typedef uint64_t SpookyV1_uint64;
 
 #endif
 
-#define SpookyV1_NUM_VARS 12
-#define SpookyV1_BLOCK_SIZE 96 // (SpookyV1_NUM_VARS * 8)
-#define SpookyV1_BUFF_SIZE 192 // (SpookyV1_BLOCK_SIZE * 2)
-#define SpookyV1_CONST 0xdeadbeefdeadbeefLL
-
+extern SpookyV1_uint16 SpookyV1_NUM_VARS;
+extern SpookyV1_uint16 SpookyV1_BLOCK_SIZE;
+extern SpookyV1_uint16 SpookyV1_BUFF_SIZE;
+extern SpookyV1_uint64 SpookyV1_CONST;
 
 struct SpookyV1_State {
+    SpookyV1_uint16 numVars;
+    SpookyV1_uint16 blockSize;
+    SpookyV1_uint16 buffSize;
+    SpookyV1_uint64 magicConst;
     SpookyV1_uint64 *data;
     SpookyV1_uint64 *state;
     size_t length;

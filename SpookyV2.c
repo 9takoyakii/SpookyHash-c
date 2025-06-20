@@ -12,6 +12,11 @@
 
 #define ALLOW_UNALIGNED_READS 1
 
+SpookyV2_uint16 SpookyV2_NUM_VARS = 12;
+SpookyV2_uint16 SpookyV2_BLOCK_SIZE = 96;
+SpookyV2_uint16 SpookyV2_BUFF_SIZE = 192;
+SpookyV2_uint64 SpookyV2_CONST = 0xdeadbeefdeadbeefLL;
+
 static SpookyV2_INLINE SpookyV2_uint64 Rot64(SpookyV2_uint64 x, int k) {
     return (x << k) | (x >> (64 - k));
 }
@@ -69,7 +74,10 @@ static SpookyV2_INLINE void End(
     EndPartial(h0, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11);
 }
 
-static SpookyV2_INLINE void ShortMix(SpookyV2_uint64 *h0, SpookyV2_uint64 *h1, SpookyV2_uint64 *h2, SpookyV2_uint64 *h3) {
+static SpookyV2_INLINE void ShortMix(
+    SpookyV2_uint64 *h0, SpookyV2_uint64 *h1, SpookyV2_uint64 *h2,
+    SpookyV2_uint64 *h3
+) {
     *h2 = Rot64(*h2, 50);  *h2 += *h3;  *h0 ^= *h2;
     *h3 = Rot64(*h3, 52);  *h3 += *h0;  *h1 ^= *h3;
     *h0 = Rot64(*h0, 30);  *h0 += *h1;  *h2 ^= *h0;
@@ -85,7 +93,8 @@ static SpookyV2_INLINE void ShortMix(SpookyV2_uint64 *h0, SpookyV2_uint64 *h1, S
 }
 
 static SpookyV2_INLINE void ShortEnd(
-    SpookyV2_uint64 *h0, SpookyV2_uint64 *h1, SpookyV2_uint64 *h2, SpookyV2_uint64 *h3
+    SpookyV2_uint64 *h0, SpookyV2_uint64 *h1,
+    SpookyV2_uint64 *h2, SpookyV2_uint64 *h3
 ) {
     *h3 ^= *h2;  *h2 = Rot64(*h2, 15);  *h3 += *h2;
     *h0 ^= *h3;  *h3 = Rot64(*h3, 52);  *h0 += *h3;
@@ -100,7 +109,13 @@ static SpookyV2_INLINE void ShortEnd(
     *h1 ^= *h0;  *h0 = Rot64(*h0, 63);  *h1 += *h0;
 }
 
-static void Short(const void *message, size_t length, SpookyV2_uint64 *hash1, SpookyV2_uint64 *hash2) {
+static void Short(
+    const void *message, size_t length,
+    SpookyV2_uint64 *hash1, SpookyV2_uint64 *hash2,
+    SpookyV2_uint16 numVars, SpookyV2_uint16 blockSize,
+    SpookyV2_uint16 buffSize, SpookyV2_uint64 magicConst
+) {
+    SpookyV2_uint64 buff[2 * blockSize];
     union {
         const SpookyV2_uint8 *p8;
         SpookyV2_uint32 *p32;
@@ -108,7 +123,6 @@ static void Short(const void *message, size_t length, SpookyV2_uint64 *hash1, Sp
         size_t i;
     } u;
     u.p8 = (const SpookyV2_uint8 *) message;
-    SpookyV2_uint64 buff[2 * SpookyV2_BLOCK_SIZE];
 
     if (!ALLOW_UNALIGNED_READS && (u.i & 0x7)) {
         memcpy(buff, message, length);
@@ -118,8 +132,8 @@ static void Short(const void *message, size_t length, SpookyV2_uint64 *hash1, Sp
     size_t r = length % 32;
     SpookyV2_uint64 a = *hash1;
     SpookyV2_uint64 b = *hash2;
-    SpookyV2_uint64 c = SpookyV2_CONST;
-    SpookyV2_uint64 d = SpookyV2_CONST;
+    SpookyV2_uint64 c = magicConst;
+    SpookyV2_uint64 d = magicConst;
 
     if (length > 15) {
         const SpookyV2_uint64 *end = u.p64 + (length / 32) * 4;
@@ -141,7 +155,7 @@ static void Short(const void *message, size_t length, SpookyV2_uint64 *hash1, Sp
         }
     }
 
-    d += ((SpookyV2_uint64)length) << 56;
+    d += ((SpookyV2_uint64) length) << 56;
     switch (r) {
         case 15: d += ((SpookyV2_uint64) u.p8[14]) << 48;
         case 14: d += ((SpookyV2_uint64) u.p8[13]) << 40;
@@ -150,26 +164,26 @@ static void Short(const void *message, size_t length, SpookyV2_uint64 *hash1, Sp
             d += u.p32[2];
             c += u.p64[0];
             break;
-        case 11: d += ((SpookyV2_uint64)u.p8[10]) << 16;
-        case 10: d += ((SpookyV2_uint64)u.p8[9]) << 8;
-        case 9: d += (SpookyV2_uint64)u.p8[8];
+        case 11: d += ((SpookyV2_uint64) u.p8[10]) << 16;
+        case 10: d += ((SpookyV2_uint64) u.p8[9]) << 8;
+        case 9: d += (SpookyV2_uint64) u.p8[8];
         case 8:
             c += u.p64[0];
             break;
-        case 7: c += ((SpookyV2_uint64)u.p8[6]) << 48;
-        case 6: c += ((SpookyV2_uint64)u.p8[5]) << 40;
-        case 5: c += ((SpookyV2_uint64)u.p8[4]) << 32;
+        case 7: c += ((SpookyV2_uint64) u.p8[6]) << 48;
+        case 6: c += ((SpookyV2_uint64) u.p8[5]) << 40;
+        case 5: c += ((SpookyV2_uint64) u.p8[4]) << 32;
         case 4:
             c += u.p32[0];
             break;
-        case 3: c += ((SpookyV2_uint64)u.p8[2]) << 16;
-        case 2: c += ((SpookyV2_uint64)u.p8[1]) << 8;
+        case 3: c += ((SpookyV2_uint64) u.p8[2]) << 16;
+        case 2: c += ((SpookyV2_uint64) u.p8[1]) << 8;
         case 1:
-            c += (SpookyV2_uint64)u.p8[0];
+            c += (SpookyV2_uint64) u.p8[0];
             break;
         case 0:
-            c += SpookyV2_CONST;
-            d += SpookyV2_CONST;
+            c += magicConst;
+            d += magicConst;
     }
 
     ShortEnd(&a, &b, &c, &d);
@@ -179,7 +193,12 @@ static void Short(const void *message, size_t length, SpookyV2_uint64 *hash1, Sp
 
 void SpookyV2_hash128(const void *message, size_t length, SpookyV2_uint64 *hash1, SpookyV2_uint64 *hash2) {
     if (length < SpookyV2_BUFF_SIZE) {
-        Short(message, length, hash1, hash2);
+        Short(
+            message, length,
+            hash1, hash2,
+            SpookyV2_NUM_VARS, SpookyV2_BLOCK_SIZE,
+            SpookyV2_BUFF_SIZE, SpookyV2_CONST
+        );
         return;
     }
 
@@ -235,6 +254,10 @@ SpookyV2_uint32 SpookyV2_hash32(const void *message, size_t length, SpookyV2_uin
 }
 
 void SpookyV2_init(struct SpookyV2_State *state, SpookyV2_uint64 seed1, SpookyV2_uint64 seed2) {
+    state->numVars = SpookyV2_NUM_VARS;
+    state->blockSize = SpookyV2_BLOCK_SIZE;
+    state->buffSize = SpookyV2_BUFF_SIZE;
+    state->magicConst = SpookyV2_CONST;
     state->data = calloc(2 * SpookyV2_NUM_VARS, sizeof(SpookyV2_uint64));
     state->state = calloc(SpookyV2_NUM_VARS, sizeof(SpookyV2_uint64));
     state->length = 0;
@@ -246,7 +269,7 @@ void SpookyV2_init(struct SpookyV2_State *state, SpookyV2_uint64 seed1, SpookyV2
 void SpookyV2_update(struct SpookyV2_State *state, const void *message, size_t length) {
     SpookyV2_uint64 h0, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11;
     size_t newLength = length + state->remainder;
-    SpookyV2_uint8  r;
+    SpookyV2_uint8 r;
     union {
         const SpookyV2_uint8 *p8;
         SpookyV2_uint64 *p64;
@@ -254,17 +277,17 @@ void SpookyV2_update(struct SpookyV2_State *state, const void *message, size_t l
     } u;
     const SpookyV2_uint64 *end;
 
-    if (newLength < SpookyV2_BUFF_SIZE) {
+    if (newLength < state->buffSize) {
         memcpy(&((SpookyV2_uint8 *) state->data)[state->remainder], message, length);
         state->length += length;
-        state->remainder = (SpookyV2_uint8)newLength;
+        state->remainder = (SpookyV2_uint8) newLength;
         return;
     }
 
-    if (state->length < SpookyV2_BUFF_SIZE) {
+    if (state->length < state->buffSize) {
         h0 = h3 = h6 = h9 = state->state[0];
         h1 = h4 = h7 = h10 = state->state[1];
-        h2 = h5 = h8 = h11 = SpookyV2_CONST;
+        h2 = h5 = h8 = h11 = state->magicConst;
     } else {
         h0 = state->state[0];
         h1 = state->state[1];
@@ -282,29 +305,29 @@ void SpookyV2_update(struct SpookyV2_State *state, const void *message, size_t l
     state->length += length;
 
     if (state->remainder) {
-        SpookyV2_uint8 prefix = SpookyV2_BUFF_SIZE - state->remainder;
+        SpookyV2_uint8 prefix = state->buffSize - state->remainder;
         memcpy(&(((SpookyV2_uint8 *) state->data)[state->remainder]), message, prefix);
         u.p64 = state->data;
         Mix(u.p64, &h0, &h1, &h2, &h3, &h4, &h5, &h6, &h7, &h8, &h9, &h10, &h11);
-        Mix(&u.p64[SpookyV2_NUM_VARS], &h0, &h1, &h2, &h3, &h4, &h5, &h6, &h7, &h8, &h9, &h10, &h11);
+        Mix(&u.p64[state->numVars], &h0, &h1, &h2, &h3, &h4, &h5, &h6, &h7, &h8, &h9, &h10, &h11);
         u.p8 = ((const SpookyV2_uint8 *) message) + prefix;
         length -= prefix;
     } else {
         u.p8 = (const SpookyV2_uint8 *) message;
     }
 
-    end = u.p64 + (length / SpookyV2_BLOCK_SIZE) * SpookyV2_NUM_VARS;
+    end = u.p64 + (length / state->blockSize) * state->numVars;
     r = (SpookyV2_uint8) (length - ((const SpookyV2_uint8 *) end - u.p8));
-    if (ALLOW_UNALIGNED_READS || (u.i & 0x7) == 0) {
+    if (ALLOW_UNALIGNED_READS || !(u.i & 0x7)) {
         while (u.p64 < end) {
             Mix(u.p64, &h0, &h1, &h2, &h3, &h4, &h5, &h6, &h7, &h8, &h9, &h10, &h11);
-            u.p64 += SpookyV2_NUM_VARS;
+            u.p64 += state->numVars;
         }
     } else {
         while (u.p64 < end) {
-            memcpy(state->data, u.p8, SpookyV2_BLOCK_SIZE);
+            memcpy(state->data, u.p8, state->blockSize);
             Mix(state->data, &h0, &h1, &h2, &h3, &h4, &h5, &h6, &h7, &h8, &h9, &h10, &h11);
-            u.p64 += SpookyV2_NUM_VARS;
+            u.p64 += state->numVars;
         }
     }
 
@@ -326,10 +349,14 @@ void SpookyV2_update(struct SpookyV2_State *state, const void *message, size_t l
 }
 
 void SpookyV2_final(struct SpookyV2_State *state, SpookyV2_uint64 *hash1, SpookyV2_uint64 *hash2) {
-    if (state->length < SpookyV2_BUFF_SIZE) {
+    if (state->length < state->buffSize) {
         *hash1 = state->state[0];
         *hash2 = state->state[1];
-        Short(state->data, state->length, hash1, hash2);
+        Short(
+            state->data, state->length,
+            hash1, hash2,
+            state->numVars, state->blockSize, state->buffSize, state->magicConst
+        );
         return;
     }
 
@@ -348,14 +375,14 @@ void SpookyV2_final(struct SpookyV2_State *state, SpookyV2_uint64 *hash1, Spooky
     SpookyV2_uint64 h10 = state->state[10];
     SpookyV2_uint64 h11 = state->state[11];
 
-    if (r >= SpookyV2_BLOCK_SIZE) {
+    if (r >= state->blockSize) {
         Mix(data, &h0, &h1, &h2, &h3, &h4, &h5, &h6, &h7, &h8, &h9, &h10, &h11);
-        data += SpookyV2_NUM_VARS;
-        r -= SpookyV2_BLOCK_SIZE;
+        data += state->numVars;
+        r -= state->blockSize;
     }
 
-    memset(&((SpookyV2_uint8 *) data)[r], 0, SpookyV2_BLOCK_SIZE - r);
-    ((SpookyV2_uint8 *) data)[SpookyV2_BLOCK_SIZE - 1] = r;
+    memset(&((SpookyV2_uint8 *) data)[r], 0, state->blockSize - r);
+    ((SpookyV2_uint8 *) data)[state->blockSize - 1] = r;
     End(data, &h0, &h1, &h2, &h3, &h4, &h5, &h6, &h7, &h8, &h9, &h10, &h11);
 
     *hash1 = h0;
@@ -365,6 +392,14 @@ void SpookyV2_final(struct SpookyV2_State *state, SpookyV2_uint64 *hash1, Spooky
 void SpookyV2_free(struct SpookyV2_State *state) {
     free(state->data);
     free(state->state);
+    state->numVars = 0;
+    state->blockSize = 0;
+    state->buffSize = 0;
+    state->magicConst = 0;
+    state->data = NULL;
+    state->state = NULL;
+    state->length = 0;
+    state->remainder = 0;
     state->length = 0;
     state->remainder = 0;
 }

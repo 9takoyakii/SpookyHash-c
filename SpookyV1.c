@@ -10,6 +10,11 @@
 #include <string.h>
 #include <stdlib.h>
 
+SpookyV1_uint16 SpookyV1_NUM_VARS = 12;
+SpookyV1_uint16 SpookyV1_BLOCK_SIZE = 96;
+SpookyV1_uint16 SpookyV1_BUFF_SIZE = 192;
+SpookyV1_uint64 SpookyV1_CONST = 0xdeadbeefdeadbeefLL;
+
 #define ALLOW_UNALIGNED_READS 1
 
 static SpookyV1_INLINE SpookyV1_uint64 Rot64(SpookyV1_uint64 x, int k) {
@@ -65,7 +70,10 @@ static SpookyV1_INLINE void End(
     EndPartial(h0, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11);
 }
 
-static SpookyV1_INLINE void ShortMix(SpookyV1_uint64 *h0, SpookyV1_uint64 *h1, SpookyV1_uint64 *h2, SpookyV1_uint64 *h3) {
+static SpookyV1_INLINE void ShortMix(
+    SpookyV1_uint64 *h0, SpookyV1_uint64 *h1, SpookyV1_uint64 *h2,
+    SpookyV1_uint64 *h3
+) {
     *h2 = Rot64(*h2, 50);  *h2 += *h3;  *h0 ^= *h2;
     *h3 = Rot64(*h3, 52);  *h3 += *h0;  *h1 ^= *h3;
     *h0 = Rot64(*h0, 30);  *h0 += *h1;  *h2 ^= *h0;
@@ -81,7 +89,8 @@ static SpookyV1_INLINE void ShortMix(SpookyV1_uint64 *h0, SpookyV1_uint64 *h1, S
 }
 
 static SpookyV1_INLINE void ShortEnd(
-    SpookyV1_uint64 *h0, SpookyV1_uint64 *h1, SpookyV1_uint64 *h2, SpookyV1_uint64 *h3
+    SpookyV1_uint64 *h0, SpookyV1_uint64 *h1,
+    SpookyV1_uint64 *h2, SpookyV1_uint64 *h3
 ) {
     *h3 ^= *h2;  *h2 = Rot64(*h2, 15);  *h3 += *h2;
     *h0 ^= *h3;  *h3 = Rot64(*h3, 52);  *h0 += *h3;
@@ -95,8 +104,13 @@ static SpookyV1_INLINE void ShortEnd(
     *h0 ^= *h3;  *h3 = Rot64(*h3, 25);  *h0 += *h3;
     *h1 ^= *h0;  *h0 = Rot64(*h0, 63);  *h1 += *h0;
 }
-
-static void Short(const void *message, size_t length, SpookyV1_uint64 *hash1, SpookyV1_uint64 *hash2) {
+static void Short(
+    const void *message, size_t length,
+    SpookyV1_uint64 *hash1, SpookyV1_uint64 *hash2,
+    SpookyV1_uint16 numVars, SpookyV1_uint16 blockSize,
+    SpookyV1_uint16 buffSize, SpookyV1_uint64 magicConst
+) {
+    SpookyV1_uint64 buff[2 * blockSize];
     union {
         const SpookyV1_uint8 *p8;
         SpookyV1_uint32 *p32;
@@ -104,7 +118,6 @@ static void Short(const void *message, size_t length, SpookyV1_uint64 *hash1, Sp
         size_t i;
     } u;
     u.p8 = (const SpookyV1_uint8 *) message;
-    SpookyV1_uint64 buff[2 * SpookyV1_BLOCK_SIZE];
 
     if (!ALLOW_UNALIGNED_READS && (u.i & 0x7)) {
         memcpy(buff, message, length);
@@ -114,8 +127,8 @@ static void Short(const void *message, size_t length, SpookyV1_uint64 *hash1, Sp
     size_t r = length % 32;
     SpookyV1_uint64 a = *hash1;
     SpookyV1_uint64 b = *hash2;
-    SpookyV1_uint64 c = SpookyV1_CONST;
-    SpookyV1_uint64 d = SpookyV1_CONST;
+    SpookyV1_uint64 c = magicConst;
+    SpookyV1_uint64 d = magicConst;
 
     if (length > 15) {
         const SpookyV1_uint64 *end = u.p64 + (length / 32) * 4;
@@ -164,10 +177,9 @@ static void Short(const void *message, size_t length, SpookyV1_uint64 *hash1, Sp
             c += (SpookyV1_uint64)u.p8[0];
             break;
         case 0:
-            c += SpookyV1_CONST;
-            d += SpookyV1_CONST;
+            c += magicConst;
+            d += magicConst;
     }
-
     ShortEnd(&a, &b, &c, &d);
     *hash1 = a;
     *hash2 = b;
@@ -175,7 +187,11 @@ static void Short(const void *message, size_t length, SpookyV1_uint64 *hash1, Sp
 
 void SpookyV1_hash128(const void *message, size_t length, SpookyV1_uint64 *hash1, SpookyV1_uint64 *hash2) {
     if (length < SpookyV1_BUFF_SIZE) {
-        Short(message, length, hash1, hash2);
+        Short(
+            message, length,
+            hash1, hash2,
+            SpookyV1_NUM_VARS, SpookyV1_BLOCK_SIZE, SpookyV1_BUFF_SIZE, SpookyV1_CONST
+        );
         return;
     }
 
@@ -233,6 +249,10 @@ SpookyV1_uint32 SpookyV1_hash32(const void *message, size_t length, SpookyV1_uin
 }
 
 void SpookyV1_init(struct SpookyV1_State *state, SpookyV1_uint64 seed1, SpookyV1_uint64 seed2) {
+    state->numVars = SpookyV1_NUM_VARS;
+    state->blockSize = SpookyV1_BLOCK_SIZE;
+    state->buffSize = SpookyV1_BUFF_SIZE;
+    state->magicConst = SpookyV1_CONST;
     state->data = calloc(2 * SpookyV1_NUM_VARS, sizeof(SpookyV1_uint64));
     state->state = calloc(SpookyV1_NUM_VARS, sizeof(SpookyV1_uint64));
     state->length = 0;
@@ -252,17 +272,17 @@ void SpookyV1_update(struct SpookyV1_State *state, const void *message, size_t l
     } u;
     const SpookyV1_uint64 *end;
 
-    if (newLength < SpookyV1_BUFF_SIZE) {
+    if (newLength < state->buffSize) {
         memcpy(&((SpookyV1_uint8 *) state->data)[state->remainder], message, length);
         state->length += length;
-        state->remainder = (SpookyV1_uint8)newLength;
+        state->remainder = (SpookyV1_uint8) newLength;
         return;
     }
 
-    if (state->length < SpookyV1_BUFF_SIZE) {
+    if (state->length < state->buffSize) {
         h0 = h3 = h6 = h9 = state->state[0];
         h1 = h4 = h7 = h10 = state->state[1];
-        h2 = h5 = h8 = h11 = SpookyV1_CONST;
+        h2 = h5 = h8 = h11 = state->magicConst;
     } else {
         h0 = state->state[0];
         h1 = state->state[1];
@@ -280,29 +300,29 @@ void SpookyV1_update(struct SpookyV1_State *state, const void *message, size_t l
     state->length += length;
 
     if (state->remainder) {
-        SpookyV1_uint8 prefix = SpookyV1_BUFF_SIZE - state->remainder;
+        SpookyV1_uint8 prefix = state->buffSize - state->remainder;
         memcpy(&(((SpookyV1_uint8 *) state->data)[state->remainder]), message, prefix);
         u.p64 = state->data;
         Mix(u.p64, &h0, &h1, &h2, &h3, &h4, &h5, &h6, &h7, &h8, &h9, &h10, &h11);
-        Mix(&u.p64[SpookyV1_NUM_VARS], &h0, &h1, &h2, &h3, &h4, &h5, &h6, &h7, &h8, &h9, &h10, &h11);
+        Mix(&u.p64[state->numVars], &h0, &h1, &h2, &h3, &h4, &h5, &h6, &h7, &h8, &h9, &h10, &h11);
         u.p8 = ((const SpookyV1_uint8 *) message) + prefix;
         length -= prefix;
     } else {
         u.p8 = (const SpookyV1_uint8 *) message;
     }
 
-    end = u.p64 + (length / SpookyV1_BLOCK_SIZE) * SpookyV1_NUM_VARS;
+    end = u.p64 + (length / state->blockSize) * state->numVars;
     r = (SpookyV1_uint8) (length - ((const SpookyV1_uint8 *) end - u.p8));
     if (ALLOW_UNALIGNED_READS || (u.i & 0x7) == 0) {
         while (u.p64 < end) {
             Mix(u.p64, &h0, &h1, &h2, &h3, &h4, &h5, &h6, &h7, &h8, &h9, &h10, &h11);
-            u.p64 += SpookyV1_NUM_VARS;
+            u.p64 += state->numVars;
         }
     } else {
         while (u.p64 < end) {
-            memcpy(state->data, u.p8, SpookyV1_BLOCK_SIZE);
+            memcpy(state->data, u.p8, state->blockSize);
             Mix(state->data, &h0, &h1, &h2, &h3, &h4, &h5, &h6, &h7, &h8, &h9, &h10, &h11);
-            u.p64 += SpookyV1_NUM_VARS;
+            u.p64 += state->numVars;
         }
     }
 
@@ -324,10 +344,14 @@ void SpookyV1_update(struct SpookyV1_State *state, const void *message, size_t l
 }
 
 void SpookyV1_final(struct SpookyV1_State *state, SpookyV1_uint64 *hash1, SpookyV1_uint64 *hash2) {
-    if (state->length < SpookyV1_BUFF_SIZE) {
+    if (state->length < state->buffSize) {
         *hash1 = state->state[0];
         *hash2 = state->state[1];
-        Short(state->data, state->length, hash1, hash2);
+        Short(
+            state->data, state->length,
+            hash1, hash2,
+            state->numVars, state->blockSize, state->buffSize, state->magicConst
+        );
         return;
     }
 
@@ -346,14 +370,14 @@ void SpookyV1_final(struct SpookyV1_State *state, SpookyV1_uint64 *hash1, Spooky
     SpookyV1_uint64 h10 = state->state[10];
     SpookyV1_uint64 h11 = state->state[11];
 
-    if (r >= SpookyV1_BLOCK_SIZE) {
+    if (r >= state->blockSize) {
         Mix(data, &h0, &h1, &h2, &h3, &h4, &h5, &h6, &h7, &h8, &h9, &h10, &h11);
-        data += SpookyV1_NUM_VARS;
-        r -= SpookyV1_BLOCK_SIZE;
+        data += state->numVars;
+        r -= state->blockSize;
     }
 
-    memset(&((SpookyV1_uint8 *) data)[r], 0, SpookyV1_BLOCK_SIZE - r);
-    ((SpookyV1_uint8 *) data)[SpookyV1_BLOCK_SIZE - 1] = r;
+    memset(&((SpookyV1_uint8 *) data)[r], 0, state->blockSize - r);
+    ((SpookyV1_uint8 *) data)[state->blockSize - 1] = r;
 
     Mix(data, &h0, &h1, &h2, &h3, &h4, &h5, &h6, &h7, &h8, &h9, &h10, &h11);
     End(&h0, &h1, &h2, &h3, &h4, &h5, &h6, &h7, &h8, &h9, &h10, &h11);

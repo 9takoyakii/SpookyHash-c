@@ -33,13 +33,16 @@ typedef uint64_t SpookyV2_uint64;
 
 #endif
 
-#define SpookyV2_NUM_VARS 12
-#define SpookyV2_BLOCK_SIZE 96 // (SpookyV2_NUM_VARS * 8)
-#define SpookyV2_BUFF_SIZE 192 // (SpookyV2_BLOCK_SIZE * 2)
-#define SpookyV2_CONST 0xdeadbeefdeadbeefLL
-
+extern SpookyV2_uint16 SpookyV2_NUM_VARS;
+extern SpookyV2_uint16 SpookyV2_BLOCK_SIZE;
+extern SpookyV2_uint16 SpookyV2_BUFF_SIZE;
+extern SpookyV2_uint64 SpookyV2_CONST;
 
 struct SpookyV2_State {
+    SpookyV2_uint16 numVars;
+    SpookyV2_uint16 blockSize;
+    SpookyV2_uint16 buffSize;
+    SpookyV2_uint64 magicConst;
     SpookyV2_uint64 *data;
     SpookyV2_uint64 *state;
     size_t length;
