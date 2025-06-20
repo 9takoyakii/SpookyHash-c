@@ -12,11 +12,11 @@
 
 #define ALLOW_UNALIGNED_READS 1
 
-static INLINE SpookyV1_uint64 Rot64(SpookyV1_uint64 x, int k) {
+static SpookyV1_INLINE SpookyV1_uint64 Rot64(SpookyV1_uint64 x, int k) {
     return (x << k) | (x >> (64 - k));
 }
 
-static INLINE void Mix(
+static SpookyV1_INLINE void Mix(
     const SpookyV1_uint64 *data,
     SpookyV1_uint64 *s0, SpookyV1_uint64 *s1, SpookyV1_uint64 *s2,  SpookyV1_uint64 *s3,
     SpookyV1_uint64 *s4, SpookyV1_uint64 *s5, SpookyV1_uint64 *s6,  SpookyV1_uint64 *s7,
@@ -36,7 +36,7 @@ static INLINE void Mix(
   *s11 += data[11];  *s1 ^= *s9;  *s10 ^= *s11;  *s11 = Rot64(*s11, 46);  *s10 += *s0;
 }
 
-static INLINE void EndPartial(
+static SpookyV1_INLINE void EndPartial(
     SpookyV1_uint64 *h0, SpookyV1_uint64 *h1, SpookyV1_uint64 *h2,  SpookyV1_uint64 *h3,
     SpookyV1_uint64 *h4, SpookyV1_uint64 *h5, SpookyV1_uint64 *h6,  SpookyV1_uint64 *h7,
     SpookyV1_uint64 *h8, SpookyV1_uint64 *h9, SpookyV1_uint64 *h10, SpookyV1_uint64 *h11
@@ -55,7 +55,7 @@ static INLINE void EndPartial(
     *h10+= *h0;    *h1 ^= *h10;   *h0 = Rot64(*h0,54);
 }
 
-static INLINE void End(
+static SpookyV1_INLINE void End(
     SpookyV1_uint64 *h0, SpookyV1_uint64 *h1, SpookyV1_uint64 *h2,  SpookyV1_uint64 *h3,
     SpookyV1_uint64 *h4, SpookyV1_uint64 *h5, SpookyV1_uint64 *h6,  SpookyV1_uint64 *h7,
     SpookyV1_uint64 *h8, SpookyV1_uint64 *h9, SpookyV1_uint64 *h10, SpookyV1_uint64 *h11
@@ -65,7 +65,7 @@ static INLINE void End(
     EndPartial(h0, h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11);
 }
 
-static INLINE void ShortMix(SpookyV1_uint64 *h0, SpookyV1_uint64 *h1, SpookyV1_uint64 *h2, SpookyV1_uint64 *h3) {
+static SpookyV1_INLINE void ShortMix(SpookyV1_uint64 *h0, SpookyV1_uint64 *h1, SpookyV1_uint64 *h2, SpookyV1_uint64 *h3) {
     *h2 = Rot64(*h2, 50);  *h2 += *h3;  *h0 ^= *h2;
     *h3 = Rot64(*h3, 52);  *h3 += *h0;  *h1 ^= *h3;
     *h0 = Rot64(*h0, 30);  *h0 += *h1;  *h2 ^= *h0;
@@ -80,7 +80,7 @@ static INLINE void ShortMix(SpookyV1_uint64 *h0, SpookyV1_uint64 *h1, SpookyV1_u
     *h1 = Rot64(*h1, 36);  *h1 += *h2;  *h3 ^= *h1;
 }
 
-static INLINE void ShortEnd(
+static SpookyV1_INLINE void ShortEnd(
     SpookyV1_uint64 *h0, SpookyV1_uint64 *h1, SpookyV1_uint64 *h2, SpookyV1_uint64 *h3
 ) {
     *h3 ^= *h2;  *h2 = Rot64(*h2, 15);  *h3 += *h2;

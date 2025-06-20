@@ -13,7 +13,7 @@
 
 #ifdef _MSVC_VER
 
-#define INLINE __forceinline
+#define SpookyV1_INLINE __forceinline
 
 typedef unsigned __int8 SpookyV1_uint8;
 typedef unsigned __int16 SpookyV1_uint16;
@@ -24,7 +24,7 @@ typedef unsigned __int64 SpookyV1_uint64;
 
 #include "stdint.h"
 
-#define INLINE inline
+#define SpookyV1_INLINE inline
 
 typedef uint8_t SpookyV1_uint8;
 typedef uint16_t SpookyV1_uint16;
