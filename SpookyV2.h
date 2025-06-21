@@ -6,8 +6,8 @@
   * All source code is in the public domain, so you are free to use, modify or distribute it.
 */
 
-#ifndef __SPOOKY_HASH_V1_C
-#define __SPOOKY_HASH_V1_C
+#ifndef __SPOOKY_HASH_V2_C
+#define __SPOOKY_HASH_V2_C
 
 #include <stddef.h>
 
